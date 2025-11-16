@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { pregnancyWeeks, calculateDueDate, calculateCurrentWeek, getBMI, type PregnancyProfile } from "@/lib/pregnancy-data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,11 +14,24 @@ import { Baby, Heart, Calendar, Scale, Ruler, Activity, Moon, Apple, Brain, Chev
 export default function PregnancyTracker() {
   const [step, setStep] = useState<"questionnaire" | "report" | "tracker">("questionnaire");
   const [currentSubStep, setCurrentSubStep] = useState(1);
-  const [profile, setProfile] = useState<Partial<PregnancyProfile>>({
-    lifestyle: { exercise: "", diet: "", sleep: "", stress: "" },
-    medicalHistory: { conditions: [], medications: [], allergies: [] }
-  });
+  const [profile, setProfile] = useState<Partial<PregnancyProfile>>(null);
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
+
+  // Carregar dados salvos ao montar o componente
+  useEffect(() => {
+    const savedProfile = localStorage.getItem("pregnancyProfile");
+    if (savedProfile) {
+      const parsedProfile = JSON.parse(savedProfile);
+      setProfile(parsedProfile);
+      setSelectedWeek(parsedProfile.currentWeek);
+      setStep("tracker");
+    } else {
+      setProfile({
+        lifestyle: { exercise: "", diet: "", sleep: "", stress: "" },
+        medicalHistory: { conditions: [], medications: [], allergies: [] }
+      });
+    }
+  }, []);
 
   const handleInputChange = (field: string, value: any) => {
     setProfile(prev => ({ ...prev, [field]: value }));
@@ -35,8 +48,13 @@ export default function PregnancyTracker() {
     if (profile.lastPeriod) {
       const dueDate = calculateDueDate(profile.lastPeriod);
       const currentWeek = calculateCurrentWeek(profile.lastPeriod);
-      setProfile(prev => ({ ...prev, dueDate, currentWeek }));
+      const updatedProfile = { ...profile, dueDate, currentWeek };
+      setProfile(updatedProfile);
       setSelectedWeek(currentWeek);
+      
+      // Salvar no localStorage
+      localStorage.setItem("pregnancyProfile", JSON.stringify(updatedProfile));
+      
       setStep("report");
     }
   };
@@ -45,7 +63,21 @@ export default function PregnancyTracker() {
     setStep("tracker");
   };
 
-  const bmi = profile.weight && profile.height ? getBMI(profile.weight, profile.height) : null;
+  const bmi = profile?.weight && profile?.height ? getBMI(profile.weight, profile.height) : null;
+
+  // Se não há perfil carregado, mostrar loading
+  if (profile === null) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-rose-50 via-pink-50 to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-rose-400 via-pink-400 to-purple-500 rounded-full mb-4 shadow-lg animate-pulse">
+            <Baby className="w-10 h-10 text-white" />
+          </div>
+          <p className="text-gray-600 text-lg">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Questionário
   if (step === "questionnaire") {
@@ -558,8 +590,8 @@ export default function PregnancyTracker() {
                 variant="outline"
                 size="icon"
                 className="h-12 w-12 border-2"
-                onClick={() => setSelectedWeek(prev => Math.max((prev || profile.currentWeek!) - 1, 4))}
-                disabled={(selectedWeek || profile.currentWeek!) <= 4}
+                onClick={() => setSelectedWeek(prev => Math.max((prev || profile.currentWeek!) - 1, 1))}
+                disabled={(selectedWeek || profile.currentWeek!) <= 1}
               >
                 <ChevronLeft className="w-6 h-6" />
               </Button>
@@ -589,14 +621,15 @@ export default function PregnancyTracker() {
               </Button>
             </div>
 
-            <div className="grid grid-cols-5 sm:grid-cols-11 gap-2">
-              {[4, 5, 8, 12, 16, 20, 24, 28, 32, 36, 40].map(week => (
+            {/* Grid de Semanas 1-40 */}
+            <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-2">
+              {Array.from({ length: 40 }, (_, i) => i + 1).map(week => (
                 <Button
                   key={week}
                   variant={(selectedWeek || profile.currentWeek) === week ? "default" : "outline"}
                   size="sm"
                   onClick={() => setSelectedWeek(week)}
-                  className={`h-12 text-base font-bold ${(selectedWeek || profile.currentWeek) === week ? 'bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600' : 'border-2'}`}
+                  className={`h-10 text-sm font-bold ${(selectedWeek || profile.currentWeek) === week ? 'bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600' : 'border-2'}`}
                 >
                   {week}
                 </Button>
@@ -607,14 +640,14 @@ export default function PregnancyTracker() {
 
         {currentWeekData && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Visualização do Bebê com Imagem 3D */}
+            {/* Visualização do Bebê com Imagem SVG */}
             <Card className="shadow-2xl border-0 lg:col-span-1 overflow-hidden">
               <CardHeader className="bg-gradient-to-br from-rose-400 via-pink-400 to-pink-500 text-white pb-8">
                 <CardTitle className="text-center text-2xl">Tamanho do Bebê</CardTitle>
               </CardHeader>
               <CardContent className="pt-8 p-6">
                 <div className="text-center space-y-6">
-                  {/* Imagem 3D do Feto */}
+                  {/* Imagem SVG do Feto */}
                   <div className="relative w-full aspect-square max-w-xs mx-auto bg-gradient-to-br from-rose-50 to-purple-50 rounded-3xl p-6 shadow-inner">
                     <img 
                       src={currentWeekData.fetalImage} 
